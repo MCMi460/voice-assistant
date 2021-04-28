@@ -10,7 +10,7 @@ import os
 import sys
 
 window = Tk.Tk()
-window.title("Assistant v0.1")
+window.title("Assistant v0.2")
 window.geometry("200x200")
 window.resizable(False,False)
 
@@ -19,17 +19,18 @@ frame.pack()
 
 window_closed = False
 listen = False
+keygrab = False
 language = 'en'
 platform = sys.platform
 
 try:
     mp3_fp = BytesIO()
-    tts = gTTS(text="I'm listening", lang=language, slow=False)
+    tts = gTTS(text="Yes?", lang=language, slow=False)
     tts.write_to_fp(mp3_fp)
     mp3_fp.seek(0)
     startvoice = AudioSegment.from_file(mp3_fp, format="mp3")
 except:
-    sys.exit("Cannot create voice.")
+    sys.exit("Cannot create voice.\nPlease create a Github issue at https://github.com/MCMi460/voice-assistant/issues/new")
 
 class Background(threading.Thread):
     def run(self,*args,**kwargs):
@@ -54,6 +55,7 @@ class Background(threading.Thread):
                     text = "Could not connect to Google Voice Recognition Services."
                     listen = False
                 if not failed:
+                    print(f"Text heard:\n\"{text}\"")
                     if "open" in text.lower():
                         text = text.split("open ")[1]
                         if platform.startswith('linux'):
@@ -64,7 +66,7 @@ class Background(threading.Thread):
                             print("Windows support non-existent")
                         text = f"Opening {text}"
                     else:
-                        text = "That's not avaiable right now."
+                        text = "That's not available right now."
                 fp = BytesIO()
                 tts = gTTS(text=text, lang=language, slow=False)
                 tts.write_to_fp(fp)
@@ -82,12 +84,38 @@ COMBINATIONS = [
 
 current = set()
 
+def remap():
+    global keygrab
+    keygrab = True
+    while True:
+        if not keygrab or window_closed:
+            break
+    keyname = str(COMBINATIONS[0]).split(":")[0].replace("{<Key.","").capitalize()
+    remapbutton.config(text=f"Activate Key: {keyname}")
+
+remapbutton = Tk.Button(frame,text="Activate Key: F4",font=("Helvetica",12),command=remap)
+remapbutton.place(x=35,y=100,width=130,height=20)
+
 def execute():
     global listen
     listen = True
 
 button = Tk.Button(frame,text="Start",font=("Helvetica",12),command=execute)
-button.place(x=70,y=70,width=60,height=20)
+button.place(x=50,y=70,width=100,height=20)
+
+author = Tk.Label(frame,text="By Deltaion Lee")
+author.config(font=("Helvetica",10))
+author.place(x=60,y=150,width=80,height=20)
+author.bind("<Button-1>", lambda e: print("https://mi460.dev/github"))
+
+title = Tk.Label(frame,text="Voice\n Assistant\n v0.2")
+title.config(font=("Helvetica",15))
+title.place(x=55,y=0,width=90,height=50)
+title.bind("<Button-1>", lambda e: print("https://github.com/MCMi460/voice-assistant"))
+
+# BROKEN, FIX TOMORROW
+# ---
+# IT IS TOMORROW, I FIXED IT, YOU'RE WELCOME
 
 def on_press(key):
     if any([key in COMBO for COMBO in COMBINATIONS]):
@@ -96,8 +124,14 @@ def on_press(key):
             execute()
 
 def on_release(key):
+    global keygrab
+    global COMBINATIONS
     if any([key in COMBO for COMBO in COMBINATIONS]):
         current.remove(key)
+    elif keygrab:
+        COMBINATIONS = []
+        COMBINATIONS.append({key})
+        keygrab = False
 
 keyboardlistener = keyboard.Listener(on_press=on_press, on_release=on_release)
 
