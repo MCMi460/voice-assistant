@@ -5,6 +5,4 @@ I will rarely update this, I just wanted to prove I could do it. You're on your 
 
 Controls:
 
-Press F4 to start speaking
-
-Say "open chrome" or something.
+Say "open chrome" or "play song".
