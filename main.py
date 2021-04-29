@@ -6,11 +6,14 @@ import threading
 from io import BytesIO
 from pydub import AudioSegment
 from pydub.playback import play
+import youtube_dl
 import os
 import sys
 
+version = 0.3
+
 window = Tk.Tk()
-window.title("Assistant v0.2")
+window.title(f"Assistant v{version}")
 window.geometry("200x200")
 window.resizable(False,False)
 
@@ -21,7 +24,21 @@ window_closed = False
 listen = False
 keygrab = False
 language = 'en'
+text = None
+fin = False
+openapp = False
+playsong = False
 platform = sys.platform
+
+ydl_opts = {
+    'format': 'bestaudio/best',
+    'outtmpl': 'yt.%(ext)s',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
+}
 
 try:
     mp3_fp = BytesIO()
@@ -32,12 +49,26 @@ try:
 except:
     sys.exit("Cannot create voice.\nPlease create a Github issue at https://github.com/MCMi460/voice-assistant/issues/new")
 
-class Background(threading.Thread):
+# START WORKING ON SECOND THREAD WITH FUNCTIONS AND KEEP VOICE LISTENING TO FIRST THREAD TOMORROW
+
+class BackgroundVoice(threading.Thread):
     def run(self,*args,**kwargs):
+        mp3_fp = BytesIO()
+        tts = gTTS(text="Voice Assistant started successfully.", lang=language, slow=False)
+        tts.write_to_fp(mp3_fp)
+        mp3_fp.seek(0)
+        play(AudioSegment.from_file(mp3_fp, format="mp3"))
+        global listen
+        global text
+        global fin
+
+        # Global functions
+        global openapp
+        global playsong
+
         while True:
             if window_closed:
                 break
-            global listen
             if listen:
                 failed = True
                 play(startvoice)
@@ -56,27 +87,62 @@ class Background(threading.Thread):
                     listen = False
                 if not failed:
                     print(f"Text heard:\n\"{text}\"")
-                    if "open" in text.lower():
-                        text = text.split("open ")[1]
-                        if platform.startswith('linux'):
-                            os.system(f"{text}")
-                        elif platform.startswith('darwin'):
-                            os.system(f"open -a \"{text}\"")
-                        elif platform.startswith('win32'):
-                            print("Windows support non-existent")
-                        text = f"Opening {text}"
+                    text = text.lower()
+                    if "open" in text:
+                        openapp = True
+                    elif text.startswith('play'):
+                        playsong = True
                     else:
                         text = "That's not available right now."
+                        fin = True
+            if fin:
                 fp = BytesIO()
                 tts = gTTS(text=text, lang=language, slow=False)
                 tts.write_to_fp(fp)
                 fp.seek(0)
                 voice = AudioSegment.from_file(fp, format="mp3")
                 play(voice)
+                fin = False
 
-task = Background()
-task.daemon = True
-task.start()
+class BackgroundFunc(threading.Thread):
+    def run(self,*args,**kwargs):
+        global fin
+        global text
+
+        # Global functions
+        global openapp
+        global playsong
+
+        while True:
+            if window_closed:
+                break
+            if openapp:
+                openapp = False
+                text = text.split("open ")[1]
+                if platform.startswith('linux'):
+                    os.system(f"{text}")
+                elif platform.startswith('darwin'):
+                    os.system(f"open -a \"{text}\"")
+                elif platform.startswith('win32'):
+                    print("Windows support non-existent")
+                text = f"Opening {text}"
+                fin = True
+            if playsong:
+                playsong = False
+                text = text.split("play ")[1]
+                text = "Playing song"
+                fin = True
+                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download(['https://www.youtube.com/watch?v=rXbv7gMsqxY'])
+                    play(AudioSegment.from_file('yt.mp3', format="mp3"))
+
+voice = BackgroundVoice()
+voice.daemon = True
+voice.start()
+
+func = BackgroundFunc()
+func.daemon = True
+func.start()
 
 COMBINATIONS = [
     {keyboard.Key.f4}
@@ -108,7 +174,7 @@ author.config(font=("Helvetica",10))
 author.place(x=60,y=150,width=80,height=20)
 author.bind("<Button-1>", lambda e: print("https://mi460.dev/github"))
 
-title = Tk.Label(frame,text="Voice\n Assistant\n v0.2")
+title = Tk.Label(frame,text=f"Voice\n Assistant\n v{version}")
 title.config(font=("Helvetica",15))
 title.place(x=55,y=0,width=90,height=50)
 title.bind("<Button-1>", lambda e: print("https://github.com/MCMi460/voice-assistant"))
