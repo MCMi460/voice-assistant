@@ -6,6 +6,7 @@ import threading
 from io import BytesIO
 from pydub import AudioSegment
 from pydub.playback import play
+import audioplayer
 import youtube_dl
 from chatterbot import ChatBot
 from chatterbot.trainers import ChatterBotCorpusTrainer
@@ -38,6 +39,9 @@ text = None
 fin = False
 openapp = False
 playsong = False
+playing = False
+player = None
+stop = False
 chatstart = False
 platform = sys.platform
 
@@ -53,7 +57,7 @@ ydl_opts = {
 
 try:
     mp3_fp = BytesIO()
-    tts = gTTS(text="Yes?", lang=language, slow=False)
+    tts = gTTS(text="I'm listening?", lang=language, slow=False)
     tts.write_to_fp(mp3_fp)
     mp3_fp.seek(0)
     startvoice = AudioSegment.from_file(mp3_fp, format="mp3")
@@ -76,11 +80,20 @@ class BackgroundVoice(threading.Thread):
         # Global functions
         global openapp
         global playsong
+        global stop
         global chatstart
 
         while True:
             if window_closed:
                 break
+            if fin:
+                fp = BytesIO()
+                tts = gTTS(text=text, lang=language, slow=False)
+                tts.write_to_fp(fp)
+                fp.seek(0)
+                voice = AudioSegment.from_file(fp, format="mp3")
+                play(voice)
+                fin = False
             if listen:
                 failed = True
                 play(startvoice)
@@ -99,26 +112,20 @@ class BackgroundVoice(threading.Thread):
                     listen = False
                 if not failed:
                     print(f"Text heard:\n\"{text}\"")
-                    text = text.lower()
-                    if "open" in text:
+                    lower = text.lower()
+                    if "open" in lower:
                         openapp = True
-                    elif text.startswith('play'):
+                    elif lower.startswith('play'):
                         playsong = True
-                    elif text.startswith('chat'):
+                    elif 'chat' in lower:
                         chatstart = not chatstart
+                    elif lower.startswith('stop'):
+                        stop = True
                     else:
                         text = "That's not available right now."
                         fin = True
-            if fin:
-                fp = BytesIO()
-                tts = gTTS(text=text, lang=language, slow=False)
-                tts.write_to_fp(fp)
-                fp.seek(0)
-                voice = AudioSegment.from_file(fp, format="mp3")
-                play(voice)
-                fin = False
 
-class BackgroundFunc(threading.Thread):
+class BackgroundTask(threading.Thread):
     def run(self,*args,**kwargs):
         r = sr.Recognizer()
 
@@ -127,7 +134,6 @@ class BackgroundFunc(threading.Thread):
 
         # Global functions
         global openapp
-        global playsong
         global chatstart
 
         while True:
@@ -135,23 +141,17 @@ class BackgroundFunc(threading.Thread):
                 break
             if openapp:
                 openapp = False
-                text = text.split("open ")[1]
+                text = text.lower().split("open ")[1]
                 if platform.startswith('linux'):
-                    os.system(f"{text}")
+                    print("Sorry, Linux support is not available.")
                 elif platform.startswith('darwin'):
                     os.system(f"open -a \"{text}\"")
                 elif platform.startswith('win32'):
-                    print("Windows support non-existent")
+                    print("Sorry, Windows support is not available.")
+                else:
+                    print("Sorry, support for your operating system is not available.")
                 text = f"Opening {text}"
                 fin = True
-            elif playsong:
-                playsong = False
-                text = text.split("play ")[1]
-                text = "Playing song"
-                fin = True
-                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download(['https://www.youtube.com/watch?v=rXbv7gMsqxY'])
-                    play(AudioSegment.from_file('yt.mp3', format="mp3"))
             elif chatstart:
                 chat_text = ""
                 with sr.Microphone() as source:
@@ -171,13 +171,53 @@ class BackgroundFunc(threading.Thread):
                 voice = AudioSegment.from_file(fp, format="mp3")
                 play(voice)
 
+class BackgroundMusic(threading.Thread):
+    def run(self,*args,**kwargs):
+        # Globalize variables
+        global playsong
+        global playing
+        global player
+        global stop
+        global text
+
+        while True:
+            if stop:
+                stop = False
+                player.stop()
+                playing = False
+                text = "Stopped music."
+                fin = True
+            if playsong:
+                playsong = False
+                if playing:
+                    player.stop()
+                    playing = False
+                text = text.lower().split("play ")[1]
+                text = "Playing song"
+                try:
+                    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download(['https://www.youtube.com/watch?v=rXbv7gMsqxY'])
+                except:
+                    text = "Could not get song from Youtube."
+                try:
+                    player = audioplayer.AudioPlayer('yt.mp3')
+                    playing = True
+                    player.play()
+                except FileNotFoundError():
+                    text = "Format not supported."
+                fin = True
+
 voice = BackgroundVoice()
 voice.daemon = True
 voice.start()
 
-func = BackgroundFunc()
-func.daemon = True
-func.start()
+task = BackgroundTask()
+task.daemon = True
+task.start()
+
+music = BackgroundMusic()
+music.daemon = True
+music.start()
 
 COMBINATIONS = [
     {keyboard.Key.f4}
@@ -238,5 +278,7 @@ keyboardlistener = keyboard.Listener(on_press=on_press, on_release=on_release)
 
 keyboardlistener.start()
 window.mainloop()
+if player:
+    player.close()
 listen = False
 window_closed = True
