@@ -5,4 +5,8 @@ I will rarely update this, I just wanted to prove I could do it. You're on your 
 
 Controls:
 
-Say "open chrome" or "play song".
+"Open <app>"
+
+"Play song"
+
+"Chat with me"

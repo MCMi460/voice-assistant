@@ -7,6 +7,8 @@ from io import BytesIO
 from pydub import AudioSegment
 from pydub.playback import play
 import youtube_dl
+from chatterbot import ChatBot
+from chatterbot.trainers import ChatterBotCorpusTrainer
 import os
 import sys
 
@@ -20,6 +22,14 @@ window.resizable(False,False)
 frame = Tk.Frame(window, width=800, height=400)
 frame.pack()
 
+chatbot = ChatBot('Voice Assistant')
+
+# Create a new trainer for the chatbot
+trainer = ChatterBotCorpusTrainer(chatbot)
+
+# Train the chatbot based on the english corpus
+trainer.train("chatterbot.corpus.english")
+
 window_closed = False
 listen = False
 keygrab = False
@@ -28,6 +38,7 @@ text = None
 fin = False
 openapp = False
 playsong = False
+chatstart = False
 platform = sys.platform
 
 ydl_opts = {
@@ -65,6 +76,7 @@ class BackgroundVoice(threading.Thread):
         # Global functions
         global openapp
         global playsong
+        global chatstart
 
         while True:
             if window_closed:
@@ -92,6 +104,8 @@ class BackgroundVoice(threading.Thread):
                         openapp = True
                     elif text.startswith('play'):
                         playsong = True
+                    elif text.startswith('chat'):
+                        chatstart = not chatstart
                     else:
                         text = "That's not available right now."
                         fin = True
@@ -106,12 +120,15 @@ class BackgroundVoice(threading.Thread):
 
 class BackgroundFunc(threading.Thread):
     def run(self,*args,**kwargs):
+        r = sr.Recognizer()
+
         global fin
         global text
 
         # Global functions
         global openapp
         global playsong
+        global chatstart
 
         while True:
             if window_closed:
@@ -127,7 +144,7 @@ class BackgroundFunc(threading.Thread):
                     print("Windows support non-existent")
                 text = f"Opening {text}"
                 fin = True
-            if playsong:
+            elif playsong:
                 playsong = False
                 text = text.split("play ")[1]
                 text = "Playing song"
@@ -135,6 +152,24 @@ class BackgroundFunc(threading.Thread):
                 with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                     ydl.download(['https://www.youtube.com/watch?v=rXbv7gMsqxY'])
                     play(AudioSegment.from_file('yt.mp3', format="mp3"))
+            elif chatstart:
+                chat_text = ""
+                with sr.Microphone() as source:
+                    print("Start speaking!")
+                    audio = r.listen(source)
+                try:
+                    chat_text = r.recognize_google(audio)
+                    print(f"<YOU> {chat_text}")
+                    chat_text = f"{chatbot.get_response(chat_text)}"
+                except sr.UnknownValueError:
+                    chat_text = "I couldn't understand you, please speak again."
+                print(f"<CHAT-BOT> {chat_text}")
+                fp = BytesIO()
+                tts = gTTS(text=chat_text, lang=language, slow=False)
+                tts.write_to_fp(fp)
+                fp.seek(0)
+                voice = AudioSegment.from_file(fp, format="mp3")
+                play(voice)
 
 voice = BackgroundVoice()
 voice.daemon = True
