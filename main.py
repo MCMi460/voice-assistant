@@ -31,6 +31,8 @@ trainer = ChatterBotCorpusTrainer(chatbot)
 # Train the chatbot based on the english corpus
 trainer.train("chatterbot.corpus.english")
 
+type = False
+
 window_closed = False
 listen = False
 keygrab = False
@@ -97,18 +99,24 @@ class BackgroundVoice(threading.Thread):
             if listen:
                 failed = True
                 play(startvoice)
-                r = sr.Recognizer()
-                with sr.Microphone() as source:
-                    print("Start speaking!")
-                    audio = r.listen(source)
-                try:
-                    text = r.recognize_google(audio)
+                if not type:
+                    r = sr.Recognizer()
+                    with sr.Microphone() as source:
+                        print("Start speaking!")
+                        audio = r.listen(source)
+                    try:
+                        text = r.recognize_google(audio)
+                        failed = False
+                        listen = False
+                    except sr.UnknownValueError:
+                        text = "We couldn't understand you, please speak again."
+                    except sr.RequestError as e:
+                        text = "Could not connect to Google Voice Recognition Services."
+                        listen = False
+                else:
+                    text = sys.stdin.readline()
+                    text = text.replace("\n","")
                     failed = False
-                    listen = False
-                except sr.UnknownValueError:
-                    text = "We couldn't understand you, please speak again."
-                except sr.RequestError as e:
-                    text = "Could not connect to Google Voice Recognition Services."
                     listen = False
                 if not failed:
                     print(f"Text heard:\n\"{text}\"")
@@ -154,15 +162,20 @@ class BackgroundTask(threading.Thread):
                 fin = True
             elif chatstart:
                 chat_text = ""
-                with sr.Microphone() as source:
-                    print("Start speaking!")
-                    audio = r.listen(source)
-                try:
-                    chat_text = r.recognize_google(audio)
-                    print(f"<YOU> {chat_text}")
+                if not type:
+                    with sr.Microphone() as source:
+                        print("Start speaking!")
+                        audio = r.listen(source)
+                    try:
+                        chat_text = r.recognize_google(audio)
+                        print(f"<YOU> {chat_text}")
+                        chat_text = f"{chatbot.get_response(chat_text)}"
+                    except sr.UnknownValueError:
+                        chat_text = "I couldn't understand you, please speak again."
+                else:
+                    chat_text = sys.stdin.readline()
+                    chat_text = text.replace("\n","")
                     chat_text = f"{chatbot.get_response(chat_text)}"
-                except sr.UnknownValueError:
-                    chat_text = "I couldn't understand you, please speak again."
                 print(f"<CHAT-BOT> {chat_text}")
                 fp = BytesIO()
                 tts = gTTS(text=chat_text, lang=language, slow=False)
@@ -236,6 +249,14 @@ def remap():
 
 remapbutton = Tk.Button(frame,text="Activate Key: F4",font=("Helvetica",12),command=remap)
 remapbutton.place(x=35,y=100,width=130,height=20)
+
+def toggle():
+    global type
+    type = not type
+    print(f"Toggled speaking! Permissions to type are now {type}.")
+
+togglespeak = Tk.Button(frame,text="Toggle Speaking",font=("Helvetica",12),command=toggle)
+togglespeak.place(x=35,y=125,width=130,height=20)
 
 def execute():
     global listen
