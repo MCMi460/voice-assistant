@@ -8,12 +8,11 @@ from pydub import AudioSegment
 from pydub.playback import play
 import audioplayer
 import youtube_dl
-from chatterbot import ChatBot
-from chatterbot.trainers import ChatterBotCorpusTrainer
+from youtube_search import YoutubeSearch
 import os
 import sys
 
-version = 0.3
+version = 0.4
 
 window = Tk.Tk()
 window.title(f"Assistant v{version}")
@@ -23,15 +22,8 @@ window.resizable(False,False)
 frame = Tk.Frame(window, width=800, height=400)
 frame.pack()
 
-chatbot = ChatBot('Voice Assistant')
-
-# Create a new trainer for the chatbot
-trainer = ChatterBotCorpusTrainer(chatbot)
-
-# Train the chatbot based on the english corpus
-trainer.train("chatterbot.corpus.english")
-
 type = False
+chatter = False
 
 window_closed = False
 listen = False
@@ -66,7 +58,18 @@ try:
 except:
     sys.exit("Cannot create voice.\nPlease create a Github issue at https://github.com/MCMi460/voice-assistant/issues/new")
 
-# START WORKING ON SECOND THREAD WITH FUNCTIONS AND KEEP VOICE LISTENING TO FIRST THREAD TOMORROW
+r = sr.Recognizer()
+
+if chatter:
+    from chatterbot import ChatBot
+    from chatterbot.trainers import ChatterBotCorpusTrainer
+    chatbot = ChatBot('Voice Assistant')
+
+    # Create a new trainer for the chatbot
+    trainer = ChatterBotCorpusTrainer(chatbot)
+
+    # Train the chatbot based on the english corpus
+    trainer.train("chatterbot.corpus.english")
 
 class BackgroundVoice(threading.Thread):
     def run(self,*args,**kwargs):
@@ -100,7 +103,6 @@ class BackgroundVoice(threading.Thread):
                 failed = True
                 play(startvoice)
                 if not type:
-                    r = sr.Recognizer()
                     with sr.Microphone() as source:
                         print("Start speaking!")
                         audio = r.listen(source)
@@ -125,7 +127,7 @@ class BackgroundVoice(threading.Thread):
                         openapp = True
                     elif lower.startswith('play'):
                         playsong = True
-                    elif 'chat' in lower:
+                    elif 'chat' in lower and chatter:
                         chatstart = not chatstart
                     elif lower.startswith('stop'):
                         stop = True
@@ -135,8 +137,6 @@ class BackgroundVoice(threading.Thread):
 
 class BackgroundTask(threading.Thread):
     def run(self,*args,**kwargs):
-        r = sr.Recognizer()
-
         global fin
         global text
 
@@ -192,6 +192,7 @@ class BackgroundMusic(threading.Thread):
         global player
         global stop
         global text
+        global fin
 
         while True:
             if stop:
@@ -205,11 +206,17 @@ class BackgroundMusic(threading.Thread):
                 if playing:
                     player.stop()
                     playing = False
-                text = text.lower().split("play ")[1]
-                text = "Playing song"
+                try:
+                    text = text.lower().split("play ")[1]
+                except:
+                    text = "Never gonna give you up"
+                if text.startswith("song "):
+                    text = text.replace("song ","")
                 try:
                     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download(['https://www.youtube.com/watch?v=rXbv7gMsqxY'])
+                        results = YoutubeSearch(text, max_results=1).to_dict()[0]
+                        ydl.download([f'https://www.youtube.com/{results["url_suffix"]}'])
+                    text = f"Playing {str(results['title'])}"
                 except:
                     text = "Could not get song from Youtube."
                 try:
