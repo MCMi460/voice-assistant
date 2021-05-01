@@ -10,8 +10,8 @@ I will rarely update this, I just wanted to prove I could do it. You're on your 
 
 Controls:
 
-"Open <app>" (opens an app of your choice)
+"Open \<app\>" (opens an app of your choice)
 
-"Play <song>" (gets from Youtube)
+"Play \<song\>" (gets from Youtube)
 
 "Chat with me" (requires enabling in the main.py file - uses chatterbox python library as a chat bot to talk with you)
