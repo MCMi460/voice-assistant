@@ -143,11 +143,21 @@ class BackgroundTask(threading.Thread):
         # Global functions
         global openapp
         global chatstart
+        global playsong
+        global playing
+        global player
+        global stop
 
         while True:
             if window_closed:
                 break
-            if openapp:
+            if stop:
+                stop = False
+                player.stop()
+                playing = False
+                text = "Stopped music."
+                fin = True
+            elif openapp:
                 openapp = False
                 text = text.lower().split("open ")[1]
                 if platform.startswith('linux'):
@@ -183,25 +193,7 @@ class BackgroundTask(threading.Thread):
                 fp.seek(0)
                 voice = AudioSegment.from_file(fp, format="mp3")
                 play(voice)
-
-class BackgroundMusic(threading.Thread):
-    def run(self,*args,**kwargs):
-        # Globalize variables
-        global playsong
-        global playing
-        global player
-        global stop
-        global text
-        global fin
-
-        while True:
-            if stop:
-                stop = False
-                player.stop()
-                playing = False
-                text = "Stopped music."
-                fin = True
-            if playsong:
+            elif playsong:
                 playsong = False
                 if playing:
                     player.stop()
@@ -234,10 +226,6 @@ voice.start()
 task = BackgroundTask()
 task.daemon = True
 task.start()
-
-music = BackgroundMusic()
-music.daemon = True
-music.start()
 
 COMBINATIONS = [
     {keyboard.Key.f4}
