@@ -15,3 +15,5 @@ Controls:
 "Play \<song\>" (gets from Youtube)
 
 "Chat with me" (requires enabling in the main.py file - uses chatterbox python library as a chat bot to talk with you)
+
+[![pypresence](https://img.shields.io/badge/using-pypresence-00bb88.svg?style=for-the-badge&logo=discord&logoWidth=20)](https://github.com/qwertyquerty/pypresence)

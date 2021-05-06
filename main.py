@@ -9,6 +9,7 @@ from pydub.playback import play
 import audioplayer
 import youtube_dl
 from youtube_search import YoutubeSearch
+from pypresence import Presence as rpc
 import os
 import sys
 
@@ -24,6 +25,7 @@ frame.pack()
 
 type = False
 chatter = False
+richpresence = True
 
 window_closed = False
 listen = False
@@ -48,6 +50,11 @@ ydl_opts = {
         'preferredquality': '192',
     }],
 }
+
+if richpresence:
+    richpresencecontroller = rpc('839686872959156255')
+    richpresencecontroller.connect()
+    richpresencecontroller.update(details="Using Voice Assistant...",state="Idle",small_image="online",large_image="logo",large_text="Delta Inc.",small_text="Active")
 
 try:
     mp3_fp = BytesIO()
@@ -139,6 +146,7 @@ class BackgroundTask(threading.Thread):
     def run(self,*args,**kwargs):
         global fin
         global text
+        global r
 
         # Global functions
         global openapp
@@ -157,6 +165,7 @@ class BackgroundTask(threading.Thread):
                 playing = False
                 text = "Stopped music."
                 fin = True
+                richpresencecontroller.update(details="Using Voice Assistant...",state="Idle",small_image="online",large_image="logo",large_text="Delta Inc.",small_text="Active")
             elif openapp:
                 openapp = False
                 text = text.lower().split("open ")[1]
@@ -209,6 +218,7 @@ class BackgroundTask(threading.Thread):
                         results = YoutubeSearch(text, max_results=1).to_dict()[0]
                         ydl.download([f'https://www.youtube.com/{results["url_suffix"]}'])
                     text = f"Playing {str(results['title'])}"
+                    richpresencecontroller.update(details="Using Voice Assistant...",state=f"Listening to {str(results['title'])}",small_image="online",large_image="logo",large_text="Delta Inc.",small_text="Active")
                 except:
                     text = "Could not get song from Youtube."
                 try:
